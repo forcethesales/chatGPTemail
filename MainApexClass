@@ -1,0 +1,51 @@
+//example code written by Brian Ricter @ Salesforce
+//updated 04.28.2023
+
+public class NGO_Base_GPTFlow {
+
+    //set up an Invocable method that can be accessed by a Flow
+    //Flows can only send and receive Lists, so the prompt variable in the Flow is sent as a collection even though it is a single string
+    @InvocableMethod(label='Send Prompt to ChatGPT' description='Makes an HTTP Callout to ChatGPT, sending a pre-built prompt and parsing the response')  
+    public static List<String> makeCallout(List<String> prompt) {
+    //Query a custom setting called ChatGPT Setting to get two fields, an Endpoint and an API Key
+    ChatGPT_Setting__c creds = ChatGPT_Setting__c.getOrgDefaults();
+    
+    //create a collection to hold the response from ChatGPT. Even though the result is a single String, Flow requires that variables be sent to and from Apex as Lists   
+    List<String> resps = new List<String>();
+
+    //create an HTTP callout by setting the type and structure of the request, including the Endpoint and API Key from the Custom Setting
+    Http http = new Http();
+    HttpRequest request = new HttpRequest();
+    request.setEndpoint(creds.Endpoint__c);
+    request.setMethod('POST');
+    request.setHeader('Content-Type', 'application/json');
+    request.setHeader('Authorization', 'Bearer ' + creds.API_Key__c);
+        
+    //The Body of this request is structured to match the required JSON format specified by ChatGPT/OpenAI's API documentation
+    //the Prompt variable is from the Flow; it's a List with only 1 string, so the [0] notation identifies that we're only using the first entry in that List
+    request.setBody('{ "model": "gpt-3.5-turbo", "messages": [{"role": "user", "content": "'+ prompt[0]+'"}], "temperature": 0.7 }');
+    
+    //output the full Body to the debug log to help troubleshoot any send errors    
+    System.debug(request.getBody());
+
+    //send the above Callout to the ChatGPT endpoint
+    HttpResponse response = http.send(request);
+        
+    //the response from ChatGPT will be sent in a JSON format; take the full JSON response as a String, then parse that String to find the portion that represents the actual answer
+    //Reference the ChatGPT/OpenAI API documentation for the exact structure, but the relevant response is the 'content' value which will be stored in a String
+    String responseBody = response.getBody();
+   system.debug(responseBody);    
+    Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(responseBody);
+    Map<String, Object> choiceMap = (Map<String, Object>) ((List<Object>) responseMap.get('choices')).get(0);
+    Map<String, Object> messageMap = (Map<String, Object>) choiceMap.get('message');
+    String content = (String) messageMap.get('content');
+	
+    //output the content value to the debug log to help troubleshoot any receive errors    
+    System.debug('Answer is ' + content);
+            
+    //add the content String to a List so that it can be returned to the Flow
+    resps.add(content);
+    return resps;
+       
+    }
+}
