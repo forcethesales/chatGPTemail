@@ -1,0 +1,45 @@
+@isTest
+//test class written by ChatGPT
+ private class NGO_Base_GPTFlow_TEST {   
+    
+    @isTest
+    static void testMakeCallout() {
+        // Set up test data
+        String testPrompt = 'What is the capital of France?';
+        List<String> testPrompts = new List<String> { testPrompt };
+        
+        // Set up mock response
+        String responseBody = '{ "id": "test123", "object": "text.completion", "choices": [{"message": {"role": "assistant", "content": "Paris"}}]}';
+        Test.setMock(HttpCalloutMock.class, new ChatGPTMock(responseBody));
+        
+        // Set up custom settings for the test
+        ChatGPT_Setting__c creds = new ChatGPT_Setting__c(Name = 'OrgDefaults', Endpoint__c = 'https://api.openai.com/v1/engines/gpt-3.5-turbo/completions', API_Key__c = 'your_api_key_here');
+        insert creds;
+        
+        // Test the makeCallout method
+        Test.startTest();
+        List<String> responses = NGO_Base_GPTFlow.makeCallout(testPrompts);
+        Test.stopTest();
+        
+        // Assert that the response is as expected
+        System.assertEquals(1, responses.size());
+        System.assertEquals('Paris', responses[0]);
+    }
+    
+    // Create a mock class for the HTTP callout
+    public class ChatGPTMock implements HttpCalloutMock {
+        private String responseBody;
+        
+        public ChatGPTMock(String responseBody) {
+            this.responseBody = responseBody;
+        }
+        
+        public HTTPResponse respond(HTTPRequest request) {
+            HttpResponse response = new HttpResponse();
+            response.setHeader('Content-Type', 'application/json');
+            response.setBody(responseBody);
+            response.setStatusCode(200);
+            return response;
+        }
+    }
+}
